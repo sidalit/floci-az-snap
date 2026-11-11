@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+umask 077
+
+export FLOCI_AZ_STORAGE_PERSISTENT_PATH="${FLOCI_AZ_STORAGE_PERSISTENT_PATH:-$SNAP_USER_COMMON/data}"
+export FLOCI_AZ_SERVICES_FUNCTIONS_CODE_PATH="${FLOCI_AZ_SERVICES_FUNCTIONS_CODE_PATH:-$FLOCI_AZ_STORAGE_PERSISTENT_PATH/functions}"
+# Upstream listens on all interfaces by default. On loopback Quarkus would
+# reject the Azure host names that Floci AZ routes on.
+export QUARKUS_HTTP_HOST="${QUARKUS_HTTP_HOST:-127.0.0.1}"
+export QUARKUS_HTTP_HOST_VALIDATION_REQUIRE_LOCALHOST="${QUARKUS_HTTP_HOST_VALIDATION_REQUIRE_LOCALHOST:-false}"
+# Reported by /_floci/health; upstream's images set it at build time.
+export FLOCI_AZ_VERSION="${FLOCI_AZ_VERSION:-$SNAP_VERSION}"
+# snapd sets TMPDIR to the snap's /tmp, which the daemon and every user's
+# foreground instance share. Vert.x cannot share its cache directory there.
+[ "${TMPDIR:-/tmp}" != /tmp ] || export TMPDIR="$SNAP_USER_COMMON/tmp"
+
+mkdir -p "$FLOCI_AZ_STORAGE_PERSISTENT_PATH" "$TMPDIR"
+for java_home in "$SNAP"/usr/lib/jvm/java-25-openjdk-*; do
+  export JAVA_HOME="$java_home"
+done
+
+exec "$JAVA_HOME/bin/java" --enable-native-access=ALL-UNNAMED \
+  -Duser.home="$HOME" -Djava.io.tmpdir="$TMPDIR" "$@" \
+  -jar "$SNAP/lib/floci-az/quarkus-run.jar"

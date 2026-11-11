@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+snapctl set addr=127.0.0.1 port=4577 storage-mode=persistent tls=false \
+  allow-unsafe-network-exposure=false

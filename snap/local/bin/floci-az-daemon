@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+umask 077
+
+export HOME="$SNAP_COMMON/home"
+export TMPDIR="$SNAP_COMMON/tmp"
+export FLOCI_AZ_STORAGE_PERSISTENT_PATH="$SNAP_COMMON/data"
+QUARKUS_HTTP_HOST="$(snapctl get addr)"
+FLOCI_AZ_PORT="$(snapctl get port)"
+FLOCI_AZ_STORAGE_MODE="$(snapctl get storage-mode)"
+FLOCI_AZ_BASE_URL="$(snapctl get base-url)"
+FLOCI_AZ_TLS_ENABLED="$(snapctl get tls)"
+export QUARKUS_HTTP_HOST FLOCI_AZ_PORT FLOCI_AZ_STORAGE_MODE
+export FLOCI_AZ_BASE_URL FLOCI_AZ_TLS_ENABLED
+[ -n "$FLOCI_AZ_BASE_URL" ] || export FLOCI_AZ_BASE_URL="http://localhost:$FLOCI_AZ_PORT"
+# The TLS proxy listens on all interfaces and reaches Quarkus on loopback.
+[ "$FLOCI_AZ_TLS_ENABLED" != true ] || QUARKUS_HTTP_HOST=127.0.0.1
+
+mkdir -p "$HOME" "$SNAP_COMMON/config"
+touch "$SNAP_COMMON/config/application.properties"
+cd "$SNAP_COMMON"
+exec "$SNAP/bin/floci-az-launch" "$@"

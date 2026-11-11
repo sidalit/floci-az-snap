@@ -1,0 +1,50 @@
+#!/bin/sh
+set -eu
+
+port="$(snapctl get port)"
+case "$port" in
+  ''|*[!0-9]*) echo 'port must be a number between 1 and 65535' >&2; exit 1 ;;
+esac
+if [ "${#port}" -gt 5 ] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+  echo 'port must be between 1 and 65535' >&2
+  exit 1
+fi
+
+addr="$(snapctl get addr)"
+case "$addr" in
+  ''|*[!A-Za-z0-9.:-]*) echo 'addr must be an IP address or hostname' >&2; exit 1 ;;
+esac
+case "$(snapctl get storage-mode)" in
+  memory|persistent|hybrid|wal) ;;
+  *) echo 'storage-mode must be memory, persistent, hybrid or wal' >&2; exit 1 ;;
+esac
+case "$(snapctl get base-url)" in
+  ''|http://?*|https://?*) ;;
+  *) echo 'base-url must start with http:// or https://' >&2; exit 1 ;;
+esac
+tls="$(snapctl get tls)"
+case "$tls" in
+  true|false) ;;
+  *) echo 'tls must be true or false' >&2; exit 1 ;;
+esac
+allow="$(snapctl get allow-unsafe-network-exposure)"
+case "$allow" in
+  true|false) ;;
+  *) echo 'allow-unsafe-network-exposure must be true or false' >&2; exit 1 ;;
+esac
+# Floci AZ has no exposure guard of its own, and its TLS proxy listens on all
+# interfaces whatever addr is.
+case "$addr" in
+  localhost|::1) exposed="$tls" ;;
+  127.*[!0-9.]*) exposed=true ;;
+  127.*) exposed="$tls" ;;
+  *) exposed=true ;;
+esac
+if [ "$exposed" = true ] && [ "$allow" != true ]; then
+  echo 'Non-loopback listeners and tls=true require allow-unsafe-network-exposure=true' >&2
+  exit 1
+fi
+
+if snapctl services "$SNAP_INSTANCE_NAME.daemon" | grep -qwE 'enabled|active'; then
+  snapctl restart "$SNAP_INSTANCE_NAME.daemon"
+fi

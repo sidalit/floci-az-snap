@@ -103,4 +103,4 @@ snapcraft pack
 
 ## License
 
-Snap packaging: [MIT](LICENSE).
+Snap packaging: [MIT](https://github.com/sidalit/floci-az-snap/blob/main/LICENSE).

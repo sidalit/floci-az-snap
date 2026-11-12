@@ -26,66 +26,39 @@ Unofficial snap packaging for [Floci AZ](https://github.com/floci-io/floci-az), 
 
 ```bash
 sudo snap install floci-az
-export AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:4577/devstoreaccount1;QueueEndpoint=http://127.0.0.1:4577/devstoreaccount1-queue;TableEndpoint=http://127.0.0.1:4577/devstoreaccount1-table;'
-az storage container create --name my-container
 ```
 
-The daemon starts automatically. Use your existing Azure CLI or SDK with the connection string above; no Azure account is needed and the key is the public development key. Blob, Queue and Table Storage, Cosmos DB, Key Vault and other in-process APIs work without Docker. Every service has its own path under `http://127.0.0.1:4577`; open that address in a browser for the dashboard, or see the [upstream service reference](https://floci.io/floci-az/services/).
+The emulator starts automatically on `http://127.0.0.1:4577`. Point your Azure CLI or SDK at it as described in the [upstream documentation](https://floci.io/floci-az/).
 
-For Functions, Event Hubs, database servers, Redis caches, other container-backed services and the web console, install Docker Engine separately and connect its socket:
+Docker-backed services and the web console need Docker Engine, installed separately:
 
 ```bash
 sudo snap connect floci-az:docker
 sudo snap restart floci-az.daemon
 ```
 
-On systems using the Docker snap, use `sudo snap connect floci-az:docker docker:docker-daemon`. The connection grants privileged Docker API access. Containers reach Floci AZ through the Docker bridge, so the console at [http://127.0.0.1:4577/_floci/ui](http://127.0.0.1:4577/_floci/ui) and functions that use the emulated storage also need a listener outside loopback, as shown below.
-
 ## Configure
-
-```bash
-sudo snap set floci-az port=4578 storage-mode=persistent
-sudo snap logs floci-az.daemon
-```
 
 | Option | Default | Purpose |
 |---|---|---|
-| `addr` | `127.0.0.1` | HTTP listener address |
-| `port` | `4577` | Azure API port, 1–65535 |
+| `addr` | `127.0.0.1` | Listen address |
+| `port` | `4577` | Azure API port |
 | `storage-mode` | `persistent` | `memory`, `persistent`, `hybrid` or `wal` |
-| `base-url` | Empty: `http://localhost:<port>` | Address advertised in API responses |
-| `tls` | `false` | Also serve HTTPS, on `port` and on 443 |
-| `allow-unsafe-network-exposure` | `false` | Required to listen outside loopback |
-
-Changes restart an enabled daemon. For a trusted development network:
+| `base-url` | `http://localhost:<port>` | Address advertised in API responses |
+| `tls` | `false` | Also serve HTTPS on `port` and 443 |
+| `allow-unsafe-network-exposure` | `false` | Required to listen outside loopback or with `tls` |
 
 ```bash
-sudo snap set floci-az addr=0.0.0.0 allow-unsafe-network-exposure=true \
-  base-url=http://192.168.1.10:4577
+sudo snap set floci-az port=4578
 ```
 
-Terraform's `azurerm` provider and the Cosmos DB Java SDK need HTTPS:
-
-```bash
-sudo snap set floci-az tls=true allow-unsafe-network-exposure=true
-curl -s http://127.0.0.1:4577/_floci/tls-cert -o floci-az.crt
-```
-
-With `tls=true`, upstream serves HTTP and HTTPS on `port` and on 443 on all interfaces, whatever `addr` is. `floci-az.crt` is the generated certificate authority for clients to trust.
-
-State lives in `/var/snap/floci-az/common/data`. Containers started for Docker-backed services are removed, with the data they hold, whenever the daemon stops or restarts. Additional [upstream configuration](https://floci.io/floci-az/configuration/advanced/application-yml/) goes in `/var/snap/floci-az/common/config/application.properties`; restart the daemon after editing. The options above take precedence over that file.
-
-Run an independent foreground instance with upstream environment variables and JVM properties, for example `FLOCI_AZ_PORT=4578 FLOCI_AZ_BASE_URL=http://localhost:4578 floci-az`. Its state uses `~/snap/floci-az/common/data`; upstream's foreground default is memory storage, so set `FLOCI_AZ_STORAGE_MODE=persistent` to retain it. For user-selected files on external storage, connect `floci-az:removable-media`.
+State lives in `/var/snap/floci-az/common/data`. Other [upstream settings](https://floci.io/floci-az/configuration/advanced/application-yml/) go in `/var/snap/floci-az/common/config/application.properties`; restart the daemon after editing.
 
 ## Limitations
 
-- Floci AZ is a development emulator with unauthenticated APIs. Exposing it gives reachable clients control of emulated resources and, when connected, container-backed workloads.
-- Docker-backed features and the console require Docker. Docker publishes their ports on all host interfaces, whatever `addr` is. The console uses host port 4500, as the `floci` snap's console does; set `floci-az.ui.port` in `application.properties` to run both.
-- The Docker interface does not connect automatically. Connections on Ubuntu Core need the appropriate Snap Store declaration; ordinary Linux hosts can connect manually. No Docker daemon is bundled.
-- TLS cannot be limited to loopback. Set `floci-az.tls.https-port=0` in `application.properties` to leave port 443 free.
-- With upstream's default `floci-az.parity=compat`, resource groups are kept in memory only; `azure` and `strict` persist them.
-- The Azure CLI and upstream's `azfloci` wrapper are not bundled. Host tools and hidden home configuration are not available.
-- Refreshes preserve shared data, but reverting a snap does not roll back that data. Back up before upgrades; use `sudo snap refresh floci-az` for updates.
+- The emulator has no authentication: keep it on loopback or a trusted network.
+- The `docker` interface is not connected automatically, and Docker publishes container ports on all interfaces.
+- `snap revert` does not roll back the emulator's data.
 
 ## Build
 

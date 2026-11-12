@@ -32,8 +32,7 @@ case "$allow" in
   true|false) ;;
   *) echo 'allow-unsafe-network-exposure must be true or false' >&2; exit 1 ;;
 esac
-# Floci AZ has no exposure guard of its own, and its TLS proxy listens on all
-# interfaces whatever addr is.
+# The TLS proxy listens on all interfaces whatever addr is.
 case "$addr" in
   localhost|::1) exposed="$tls" ;;
   127.*[!0-9.]*) exposed=true ;;
